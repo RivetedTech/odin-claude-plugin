@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+#
+# odin — thin authenticated curl wrapper for the Odin REST API.
+#
+# Reads the environment:
+#   ODIN_API_TOKEN     (required)  the opat_ personal access token
+#   ODIN_API_BASE_URL  (required)  backend origin, e.g. https://api.odinhelp.net
+#   ODIN_TENANT_ID     (optional)  sent as X-Active-Tenant-Id
+#
+# Usage:
+#   odin preflight                          # validate the token, print identity + expiry
+#   odin GET    /api/tickets?pageSize=20
+#   odin POST   /api/tickets '{"subject":"...","priority":"high"}'
+#   odin PATCH  /api/tickets/T1024 '{"status":"in_progress"}'
+#   odin DELETE /api/profile/tokens/<tokenId>
+#   odin --all GET /api/customers           # auto-follow every page, stream items
+#
+# The token is never echoed. Exits non-zero on any non-2xx response.
+set -euo pipefail
+
+die() { printf 'odin: %s\n' "$*" >&2; exit 2; }
+
+: "${ODIN_API_TOKEN:?set ODIN_API_TOKEN to your opat_ personal access token}"
+: "${ODIN_API_BASE_URL:?set ODIN_API_BASE_URL (dev https://api.odinhelp.net, prod https://api.odinhelp.com)}"
+
+BASE="${ODIN_API_BASE_URL%/}"
+
+have_jq() { command -v jq >/dev/null 2>&1; }
+
+# pretty <json> — print JSON, formatted via jq when available.
+pretty() {
+  if have_jq; then printf '%s' "$1" | jq . 2>/dev/null || printf '%s\n' "$1"
+  else printf '%s\n' "$1"; fi
+}
+
+# Header args as an array so the token is never interpolated into a printed
+# command line.
+_headers=(
+  -H "Authorization: Bearer ${ODIN_API_TOKEN}"
+  -H "Accept: application/json"
+)
+[[ -n "${ODIN_TENANT_ID:-}" ]] && _headers+=(-H "X-Active-Tenant-Id: ${ODIN_TENANT_ID}")
+
+# request METHOD PATH [BODY] — one call. Sets globals RESP_BODY and RESP_CODE.
+RESP_BODY=""
+RESP_CODE=""
+request() {
+  local method="$1" path="$2" body="${3:-}"
+  local url="${BASE}${path}"
+  local args=(-sS -X "$method" "${_headers[@]}")
+  [[ -n "$body" ]] && args+=(-H "Content-Type: application/json" --data "$body")
+  local raw
+  raw="$(curl "${args[@]}" -w $'\n%{http_code}' "$url")"
+  RESP_CODE="${raw##*$'\n'}"
+  RESP_BODY="${raw%$'\n'*}"
+}
+
+# jq read with a `.data.` (backend envelope) then top-level fallback.
+_field() { printf '%s' "$RESP_BODY" | jq -r "$1" 2>/dev/null || true; }
+
+cmd_preflight() {
+  request GET "/api/profile/tokens/validate"
+  if [[ "$RESP_CODE" != 2* ]]; then
+    printf 'INVALID — token missing, expired, or revoked (HTTP %s). Reissue it on your Profile.\n' "$RESP_CODE" >&2
+    pretty "$RESP_BODY" >&2
+    return 1
+  fi
+  if have_jq; then
+    local email tenant days
+    email="$(_field '.data.userEmail // .userEmail // "unknown"')"
+    tenant="$(_field '.data.tenantId // .tenantId // "unknown"')"
+    days="$(_field '.data.daysRemaining // .daysRemaining // empty')"
+    if [[ -n "$days" ]]; then
+      printf 'valid · %s · tenant %s · expires in %s days\n' "$email" "$tenant" "$days"
+    else
+      printf 'valid · %s · tenant %s\n' "$email" "$tenant"
+    fi
+  else
+    printf 'valid (HTTP %s)\n' "$RESP_CODE"
+  fi
+}
+
+cmd_request() {
+  local method="$1" path="$2" body="${3:-}"
+  request "$method" "$path" "$body"
+  pretty "$RESP_BODY"
+  [[ "$RESP_CODE" == 2* ]] || { printf 'odin: HTTP %s\n' "$RESP_CODE" >&2; return 1; }
+}
+
+# --all: GET every page, streaming each page's data items as NDJSON.
+cmd_all() {
+  local method="$1" path="$2"
+  have_jq || die "--all requires jq"
+  [[ "$method" == "GET" ]] || die "--all only supports GET"
+  local cursor="" sep="?"
+  [[ "$path" == *\?* ]] && sep="&"
+  while :; do
+    local url_path="$path"
+    [[ -n "$cursor" ]] && url_path="${path}${sep}cursor=${cursor}"
+    request GET "$url_path"
+    if [[ "$RESP_CODE" != 2* ]]; then
+      printf 'odin: HTTP %s\n' "$RESP_CODE" >&2; pretty "$RESP_BODY" >&2; return 1
+    fi
+    # Guard against an empty/non-array body under `set -euo pipefail`: fall back
+    # to `{}` for an empty body and use the optional iterator `[]?` so jq never
+    # aborts the script mid-pagination. (A literal `${RESP_BODY:-{}}` mis-parses
+    # in bash — the default's `}` closes the expansion early — so branch here.)
+    local page_body="$RESP_BODY"
+    [[ -n "$page_body" ]] || page_body='{}'
+    printf '%s' "$page_body" | jq -c '(.data.data // .data // [])[]?'
+    cursor="$(_field '.data.nextCursor // .nextCursor // empty')"
+    [[ -n "$cursor" ]] || break
+  done
+}
+
+main() {
+  [[ $# -ge 1 ]] || die "usage: odin preflight | odin <METHOD> <path> [json] | odin --all GET <path>"
+  case "$1" in
+    preflight) cmd_preflight ;;
+    --all) shift; [[ $# -ge 2 ]] || die "usage: odin --all GET <path>"; cmd_all "$1" "$2" ;;
+    GET|POST|PUT|PATCH|DELETE)
+      [[ $# -ge 2 ]] || die "usage: odin $1 <path> [json]"
+      cmd_request "$1" "$2" "${3:-}" ;;
+    -h|--help|help) sed -n '3,20p' "$0" ;;
+    *) die "unknown command '$1' (expected preflight, --all, or an HTTP method)" ;;
+  esac
+}
+
+main "$@"

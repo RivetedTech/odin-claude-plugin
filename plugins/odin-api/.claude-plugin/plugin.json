@@ -1,0 +1,12 @@
+{
+  "name": "odin-api",
+  "description": "Drive the Odin REST API from Claude — tickets, customers, contacts, RMM agents, analytics, invoices and agreements — authenticated as you with your own permissions.",
+  "version": "11.2.0",
+  "homepage": "https://www.odinhelp.com/skill/",
+  "repository": "https://github.com/RivetedTech/odin-claude-plugin",
+  "license": "MIT",
+  "author": {
+    "name": "Riveted Technology",
+    "url": "https://www.odinhelp.com"
+  }
+}

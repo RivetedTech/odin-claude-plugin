@@ -1,0 +1,33 @@
+{
+  "name": "odin",
+  "owner": {
+    "name": "Riveted Technology",
+    "url": "https://www.odinhelp.com"
+  },
+  "description": "Claude plugins for Odin — the help desk, RMM and PSA platform.",
+  "plugins": [
+    {
+      "name": "odin-api",
+      "source": "./plugins/odin-api",
+      "displayName": "Odin API",
+      "description": "Drive the Odin REST API from Claude — tickets, customers, contacts, RMM agents, analytics, invoices and agreements — authenticated as you with your own permissions.",
+      "homepage": "https://www.odinhelp.com/skill/",
+      "repository": "https://github.com/RivetedTech/odin-claude-plugin",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": [
+        "odin",
+        "helpdesk",
+        "rmm",
+        "psa",
+        "ticketing",
+        "msp"
+      ],
+      "author": {
+        "name": "Riveted Technology",
+        "url": "https://www.odinhelp.com"
+      },
+      "version": "11.2.0"
+    }
+  ]
+}

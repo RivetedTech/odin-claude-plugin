@@ -1,7 +1,7 @@
 {
   "name": "odin-api",
-  "description": "Drive the Odin REST API from Claude — tickets, customers, contacts, RMM agents, analytics, invoices and agreements — authenticated as you with your own permissions.",
-  "version": "11.2.0",
+  "description": "Use Odin from Codex, ChatGPT or Claude: tickets, work records, source context, leads, reminders, webhooks, monitoring, billing, agreements and RMM with your live permissions.",
+  "version": "12.101.0",
   "homepage": "https://www.odinhelp.com/skill/",
   "repository": "https://github.com/RivetedTech/odin-claude-plugin",
   "license": "MIT",

@@ -10,7 +10,7 @@
       "name": "odin-api",
       "source": "./plugins/odin-api",
       "displayName": "Odin API",
-      "description": "Use the Odin REST API with Codex, ChatGPT or Claude \u2014 tickets, customers, contacts, RMM, analytics, invoices and agreements, with your live permissions.",
+      "description": "Use Odin from Codex, ChatGPT or Claude: tickets, work records, source context, leads, reminders, webhooks, monitoring, billing, agreements and RMM with your live permissions.",
       "homepage": "https://www.odinhelp.com/skill/",
       "repository": "https://github.com/RivetedTech/odin-claude-plugin",
       "license": "MIT",
@@ -27,7 +27,7 @@
         "name": "Riveted Technology",
         "url": "https://www.odinhelp.com"
       },
-      "version": "11.2.1"
+      "version": "12.101.0"
     }
   ]
 }

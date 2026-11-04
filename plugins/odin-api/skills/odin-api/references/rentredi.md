@@ -110,26 +110,36 @@ scripts/odin GET /api/rentredi/connections \
            | "\(.status)\t\(.name)\t\(.lastFailureReason // "-")"'
 ```
 
-Empty output means every connection is healthy.
+After a successful response, empty output means no non-connected accounts were
+listed. Inspect the list itself to distinguish healthy connections from a tenant
+with no configured connections; a failed request is never a healthy result.
 
 Two things about that command are easy to get wrong. The list is returned as
 `{ "success": true, "data": { "items": [...] } }` — an `items` object, **not**
 the `{ data: [...], nextCursor }` page envelope most Odin list endpoints use —
 so the jq path is `.data.items[]`. And it is **not paginated**: there is no
-cursor, so `odin --all` does not apply here and would emit the array as a
-single blob rather than one connection per line.
+cursor, so use a single GET rather than treating it as a paginated collection.
+The current wrapper can stream `items` arrays, but that does not make this API
+paginated or supply additional connection data.
 
 ## Creating a connection
 
-```bash
-scripts/odin POST /api/rentredi/connections '{
+Prepare protected request JSON through the host's secure credential handoff:
+
+```json
+{
   "name": "Riverside Portfolio",
   "refreshToken": "AMf-…",
   "customerId": "cust-1",
   "brandId": null,
   "email": "owner@example.com"
-}'
+}
 ```
+
+`refreshToken` above is a placeholder. Never paste a real value in chat or
+inline shell arguments. With a mode-0600 local request file, run
+`scripts/odin --body-file /secure/path/rentredi-request.json POST /api/rentredi/connections`.
+Do not display the file.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -159,7 +169,8 @@ The supported flow is:
 1. The **user** signs in at `app.rentredi.com` and answers the challenge.
 2. They click the "Grab RentRedi session" bookmarklet on Odin's RentRedi
    settings screen, which copies the refresh token to their clipboard.
-3. They paste it into Odin, or hand it to you for a `POST`/`PATCH`.
+3. They paste it into Odin, or provide it through the host's supported secure
+   credential handoff for an authorized `POST`/`PATCH`. Never request it in chat.
 
 If a user asks you to log into RentRedi for them, explain that the challenge is
 a bot-protection control working as intended and point them at the bookmarklet.
@@ -176,9 +187,9 @@ and the fix is always steps 1–3 above.
 `POST /api/rentredi/test-connection` proves a token and stores nothing —
 useful before committing to a create, or to check a token a user just captured:
 
-```bash
-scripts/odin POST /api/rentredi/test-connection '{"refreshToken":"AMf-…"}'
-```
+Use a protected request file containing the `refreshToken` field:
+`scripts/odin --body-file /secure/path/rentredi-test.json POST /api/rentredi/test-connection`.
+Do not print the file or token.
 
 Both this and the per-connection `/test` return:
 
@@ -197,5 +208,7 @@ doubles as "I fixed it, re-arm the alerting".
 ## Deleting
 
 `DELETE /api/rentredi/connections/{connectionId}` removes the row and purges
-the stored secret. There is no undo and no soft delete — confirm with the user
-before calling it, and remember that recreating means capturing a fresh token.
+the stored secret. There is no undo and no soft delete. Establish authorization
+for this specific connection removal under the host's current rules; existing
+explicit authorization need not be requested again. Recreating the connection
+requires capturing a fresh token.

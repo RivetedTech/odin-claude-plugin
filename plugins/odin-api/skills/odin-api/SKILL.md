@@ -3,8 +3,9 @@ name: odin-api
 description: >-
   Query and manage the Odin support-platform REST API from Codex, ChatGPT or
   Claude when authorized tools are available. Use for tickets, customers,
-  contacts, RMM agents, dashboard analytics, invoices, agreements, Personal
-  Access Tokens and RentRedi connection health. Documentation-only hosts can
+  contacts, RMM agents, work records, source-backed context, leads, reminders,
+  notification webhooks, monitoring, invoices, agreements, Personal Access
+  Tokens and RentRedi connection health. Documentation-only hosts can
   explain endpoints and plan requests without claiming account access.
 ---
 
@@ -14,6 +15,37 @@ Read [references/endpoints.md](references/endpoints.md) for methods, response
 shapes and permissions. Read [references/rentredi.md](references/rentredi.md)
 before using RentRedi. Skill files are portable instructions; installing them
 alone never connects an Odin account or grants additional permissions.
+
+## Select the workflow
+
+The source baseline is Odin **12.101.0**, reviewed 2026-11-04. Read
+[references/capabilities.md](references/capabilities.md) for source provenance,
+runtime availability limits, feature gates and a map of references. Source
+support alone does not establish deployment or access in the active account.
+
+- For a fresh session, use [references/assistant-retrieval.md](references/assistant-retrieval.md).
+  Retrieve every selected scope and page, preserve current-context checkpoints,
+  drain its change queries and fetch changed records. `--all` emits items only;
+  use ordinary GET calls when checkpoints/metadata must be retained.
+- For obligations, owners, dependencies, deadlines, completion proof and
+  optional reminder schedules, read [references/persistence.md](references/persistence.md).
+  Native work is independent of reminder delivery. Keep payment, physical work,
+  reinspection and certificate evidence as separately verifiable obligations.
+- For leads and manual activities, read [references/native-sales.md](references/native-sales.md).
+  These records send no outreach and do not require Salesforce or a customer.
+- For facts, decisions and meeting context, read
+  [references/source-context.md](references/source-context.md). Preserve source
+  attribution, uncertainty, corrections, scope and unavailable-source stubs.
+- For opt-in user webhook delivery, read
+  [references/notification-webhooks.md](references/notification-webhooks.md).
+  Configuration, activation, a synthetic HTTP test and replay have distinct
+  authorization and version requirements. Delivery defaults off.
+- For service checks, outages, incidents and reports, read
+  [references/monitoring.md](references/monitoring.md). Monitoring uses a
+  dedicated API; the primary route manifest alone omits its concrete methods.
+- For invoice sends/charges/refunds and agreement workflows, read
+  [references/billing-agreements.md](references/billing-agreements.md).
+  Poll accepted asynchronous work; do not report HTTP 202 as completion.
 
 ## Choose the available execution mode
 
@@ -61,6 +93,8 @@ scripts/odin GET '/api/tickets/T1024'
 scripts/odin POST /api/tickets '{"subject":"Printer down","priority":"high","description":"Synthetic example"}'
 scripts/odin PUT /api/tickets/T1024 '{"status":"in_progress"}'
 scripts/odin --all GET /api/customers
+scripts/odin GET '/api/native-context/RECORD_ID?operation=history'
+scripts/odin --all GET '/api/work-records?pageSize=100'
 scripts/odin GET /api/rentredi/connections \
   | jq -r '.data.items[] | select(.status == "disconnected") | [.name,.lastFailureReason] | @tsv'
 ```
@@ -74,6 +108,22 @@ page. Use `--all` only for supported paginated collections; RentRedi connections
 are a single, nonpaginated `data.items` list. It exposes connection management,
 not properties, units, leases, renters or payments. `disconnected` needs a
 human; `degraded` retries automatically. Do not bypass browser sign-in challenges.
+
+Native writes require stable request identity, and edits require the current
+version. The wrapper supports options **before the method**:
+
+```bash
+scripts/odin --idempotency-key demo-work-v1 POST /api/work-records \
+  '{"title":"Verify inspection outcome","owner":"Demo operator"}'
+scripts/odin --idempotency-key demo-work-v2 --if-match 1 PATCH /api/work-records/RECORD_ID \
+  '{"nextAction":"Obtain inspection evidence","reason":"User correction"}'
+```
+
+After an ambiguous transport result, reuse the identical request/key/body and
+precondition. After a version conflict, reload and reconcile before issuing a
+new request key. Use `--body-file /secure/path/request.json` for secret-bearing
+JSON, rather than putting secrets in shell arguments. Never display that file.
+For native context history, use `?operation=history`, not a `/history` child.
 
 ## Authorization and data handling
 

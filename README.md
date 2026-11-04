@@ -62,6 +62,24 @@ issuing user's live permissions and feature access.
 The documentation-only package can explain API requests without credentials.
 Installing any package alone does not authorize credential creation or writes.
 
+## Current API coverage
+
+The reference is reviewed against Odin **12.101.0**, platform commit
+`63180f19bcdcea806feb2e7dddc80a27e3a3e6c4` (2026-11-04). It covers work records,
+source-backed context, leads, scoped current-context retrieval, reminders and
+delivery receipts, opt-in webhooks, monitoring, invoice/refund workflows,
+agreements and RentRedi connection management alongside the core platform API.
+The source snapshot includes 556 primary route registrations; dedicated
+monitoring and concrete catch-all operations have their own references.
+Source verification does not assert deployment or account/feature access.
+
+The wrapper supports `--idempotency-key`, `--if-match` and `--body-file` before
+the HTTP method, plus native `data.items` pagination, encoded opaque cursors,
+and explicit failure for incomplete or looping traversal. It accepts only the
+verified production/development HTTPS origins. Help works without credentials.
+Use ordinary GET calls when current-context checkpoints or receipt metadata
+need to be retained: `--all` streams items only.
+
 ## Validate and maintain
 
 ```bash
@@ -69,6 +87,11 @@ bash -n plugins/odin-api/skills/odin-api/scripts/odin
 python3 -m unittest discover -s tests -v
 python3 scripts/build-skill.py
 ```
+
+Regenerate the routing snapshot from a clean SupportPlatform checkout with
+`python3 scripts/update-route-catalog.py --platform-root <checkout>`; add
+`--check` to compare without writing. Review concrete handlers and update the
+curated references/source pin together.
 
 This repository is also the target of SupportPlatform's
 `.github/workflows/publish-skill.yml`. That publisher currently replaces all

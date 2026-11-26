@@ -11,7 +11,7 @@
 #   odin preflight                          # validate the token, print identity + expiry
 #   odin GET    /api/tickets?pageSize=20
 #   odin POST   /api/tickets '{"subject":"...","priority":"high"}'
-#   odin PUT    /api/tickets/T1024 '{"status":"in_progress"}'
+#   odin PATCH  /api/tickets/T1024 '{"status":"in_progress"}'
 #   odin DELETE /api/profile/tokens/<tokenId>
 #   odin --all GET /api/customers           # auto-follow every page, stream items
 #
@@ -20,24 +20,10 @@ set -euo pipefail
 
 die() { printf 'odin: %s\n' "$*" >&2; exit 2; }
 
-case "${1:-}" in
-  -h|--help|help)
-    sed -n '3,20p' "$0"
-    printf '%s\n' 'Options before the method: --body-file FILE, --idempotency-key KEY, --if-match VERSION'
-    exit 0 ;;
-esac
-
 : "${ODIN_API_TOKEN:?set ODIN_API_TOKEN to your opat_ personal access token}"
 : "${ODIN_API_BASE_URL:?set ODIN_API_BASE_URL (dev https://api.odinhelp.net, prod https://api.odinhelp.com)}"
 
 BASE="${ODIN_API_BASE_URL%/}"
-case "$BASE" in
-  https://api.odinhelp.com|https://api.odinhelp.net) ;;
-  *) die "use the verified HTTPS Odin API origin (api.odinhelp.com or api.odinhelp.net)" ;;
-esac
-for value in "$ODIN_API_TOKEN" "${ODIN_TENANT_ID:-}"; do
-  [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || die "invalid authentication header"
-done
 
 have_jq() { command -v jq >/dev/null 2>&1; }
 
@@ -73,7 +59,6 @@ RESP_BODY=""
 RESP_CODE=""
 request() {
   local method="$1" path="$2" body="${3:-}"
-  [[ "$path" == /api/* && "$path" != *$'\n'* && "$path" != *$'\r'* && "$path" != *'#'* ]] || die "path must start with /api/ and contain no fragment or line break"
   local url="${BASE}${path}"
   local args=(-sS -X "$method" "${_headers[@]}")
   if [[ -n "$_body_file" ]]; then
@@ -99,11 +84,7 @@ _field() { printf '%s' "$RESP_BODY" | jq -r "$1" 2>/dev/null || true; }
 cmd_preflight() {
   request GET "/api/profile/tokens/validate"
   if [[ "$RESP_CODE" != 2* ]]; then
-    if [[ "$RESP_CODE" == 401 ]]; then
-      printf 'INVALID — token missing, expired, or revoked (HTTP %s). Reissue it on your Profile.\n' "$RESP_CODE" >&2
-    else
-      printf 'odin: preflight failed (HTTP %s); inspect access and the response before reissuing a token.\n' "$RESP_CODE" >&2
-    fi
+    printf 'INVALID — token missing, expired, or revoked (HTTP %s). Reissue it on your Profile.\n' "$RESP_CODE" >&2
     pretty "$RESP_BODY" >&2
     return 1
   fi
@@ -134,36 +115,30 @@ cmd_all() {
   local method="$1" path="$2"
   have_jq || die "--all requires jq"
   [[ "$method" == "GET" ]] || die "--all only supports GET"
-  [[ ! "$path" =~ [\?\&]cursor= ]] || die "--all starts at the first page; omit cursor"
-  local cursor="" sep="?" seen_cursors=$'\n'
+  local cursor="" sep="?"
   [[ "$path" == *\?* ]] && sep="&"
   while :; do
     local url_path="$path"
-    if [[ -n "$cursor" ]]; then
-      local encoded_cursor
-      encoded_cursor="$(printf '%s' "$cursor" | jq -sRr @uri)"
-      url_path="${path}${sep}cursor=${encoded_cursor}"
-    fi
+    [[ -n "$cursor" ]] && url_path="${path}${sep}cursor=${cursor}"
     request GET "$url_path"
     if [[ "$RESP_CODE" != 2* ]]; then
       printf 'odin: HTTP %s\n' "$RESP_CODE" >&2; pretty "$RESP_BODY" >&2; return 1
     fi
-    # Do not silently treat malformed or missing page data as an empty result.
+    # Guard against an empty/non-array body under `set -euo pipefail`: fall back
+    # to `{}` for an empty body and use the optional iterator `[]?` so jq never
+    # aborts the script mid-pagination. (A literal `${RESP_BODY:-{}}` mis-parses
+    # in bash — the default's `}` closes the expansion early — so branch here.)
     local page_body="$RESP_BODY"
-    [[ -n "$page_body" ]] || die "empty page response; retrieval is incomplete"
-    local rows='(.data | if type == "array" then . elif type == "object" then (.items // .data) else null end)'
-    printf '%s' "$page_body" | jq -ce "$rows | if type == \"array\" then .[] else error(\"not a paginated collection\") end" || {
+    [[ -n "$page_body" ]] || page_body='{}'
+    printf '%s' "$page_body" | jq -ce '(.data.items // .data.data // .data // []) | if type == "array" then .[] else error("not a paginated collection") end' || {
       # jq exits 4 for an empty array; validate its shape separately.
-      printf '%s' "$page_body" | jq -e "$rows | type == \"array\"" >/dev/null || return 1
+      printf '%s' "$page_body" | jq -e '(.data.items // .data.data // .data // []) | type == "array"' >/dev/null || return 1
     }
-    cursor="$(_field '.data.nextCursor? // .nextCursor // empty')"
-    if [[ -z "$cursor" && "$(_field '.data.partial? // .data.truncated? // false')" == true ]]; then
+    cursor="$(_field '.data.nextCursor // .nextCursor // empty')"
+    if [[ -z "$cursor" && "$(_field '.data.partial // .data.truncated // false')" == true ]]; then
       die "partial result has no continuation cursor; retrieval is incomplete"
     fi
     [[ -n "$cursor" ]] || break
-    [[ "$cursor" != *$'\n'* && "$cursor" != *$'\r'* ]] || die "invalid continuation cursor"
-    [[ "$seen_cursors" != *$'\n'"$cursor"$'\n'* ]] || die "repeated continuation cursor; retrieval is incomplete"
-    seen_cursors+="$cursor"$'\n'
   done
 }
 

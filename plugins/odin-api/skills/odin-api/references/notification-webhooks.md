@@ -1,4 +1,4 @@
-# User notification webhooks (reviewed source contract)
+# User notification webhooks (pending release)
 
 Records-only sales remains records-only. These opt-in notifications are separate
 from Salesforce, campaigns and the existing alert/rule whole-ticket webhooks.
@@ -52,8 +52,10 @@ settings advances an epoch: already queued events stop, including after resume.
 Rotation keeps the epoch, uses the new key for queued deliveries and revokes the
 previous signing secret in Odin. In-flight HTTP requests cannot be recalled.
 
-Events: `work.created|updated|completed|reopened|canceled`, `lead.created|updated`,
-`activity.created|updated`, `context.created|updated`, `reminder.due`.
+Events: `work.created|updated|completed|reopened|canceled`, `context.created|updated`,
+`reminder.due`. `lead.created|updated` and `activity.created|updated` are retired
+(Leads come from the CRM): a write that adds one is refused with a 400, and an
+endpoint that already has one keeps it, but nothing emits them any more.
 Payload `schemaVersion:1` has stable `eventId`, type, tenantId, occurredAt,
 synthetic, and data containing recordId/kind/eventVersion/deepLink, plus
 currentVersion where available. Links are relative authorized Odin links.

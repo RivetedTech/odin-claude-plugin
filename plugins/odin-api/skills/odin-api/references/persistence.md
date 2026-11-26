@@ -1,8 +1,7 @@
 # Native persistence contract
 
-This reference describes the implementation in the reviewed Odin source. See
-[capabilities.md](capabilities.md) for its pinned version. Source support does not
-establish deployment, enabled features or access in a particular account.
+This reference describes draft implementation, pending release. Never infer
+that the public API or installed skill supports it before checking the release.
 
 `/api/work-records` is served by the existing domain collection/detail routes;
 no new API Gateway resources are required. It uses native DynamoDB persistence,
@@ -149,7 +148,8 @@ occurrences and 100 excluded dates; an exceeded budget is an explicit error.
 
 Existing closed-ticket reminders now pause, stay visible, and show
 `pauseReason:"closed_ticket_paused"`. Explicit continue permits delivery after
-closure; missing/deleted tickets always suppress. This reference does not enable any production migration or integration. Past sent legacy rows lack
+closure; missing/deleted tickets always suppress. No production migration or
+integration was enabled by these draft changes. Past sent legacy rows lack
 receipts and are reported as uncertain, never retrospectively verified or retried.
 
 `GET /api/ticket-reminders/{id}?operation=deliveries|attempts|history` returns an

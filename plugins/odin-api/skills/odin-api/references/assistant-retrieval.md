@@ -1,6 +1,4 @@
-# Fresh-session assistant retrieval (reviewed source contract)
-
-See [capabilities.md](capabilities.md) for the pinned source and runtime availability limits.
+# Fresh-session assistant retrieval (pending release)
 
 Use the user's live session/PAT. Preflight first. No assistant bypass or
 conversation-window memory is required.
@@ -80,12 +78,11 @@ Completion cancels applicable schedule work atomically, retaining history.
 Paid stages, acknowledgments, appointments and sent requests do not prove larger
 completion. Cancel/archive/lost deal/manual sequence completion remain distinct.
 
-Platform-repository acceptance command (requires a SupportPlatform checkout and
-disposable DynamoDB Local on 127.0.0.1:8001; not a command supplied by this plugin):
+Local acceptance command (disposable DynamoDB Local on 127.0.0.1:8001):
 `npx ts-node --transpile-only --project backend/tsconfig.json
 backend/integration/assistant-persistence.ts`. Synthetic PAT/roles/data exercise
 real authentication/conditional transactions; all SDK requests are redirected
 to localhost. No notification provider or source URL is invoked.
 
 
-Feature ownership: native work CRUD, permanent links, history, search, changes and linked-source access use `tools.work-records`. Scheduling and reminder receipts use `service-desk.reminders` independently. Lead/activity collections use `sales.leads`; context uses `service-desk.context`. Current-context exposes only currently authorized enabled collections and omits reminder data/queries when Reminders is disabled. Disabling Work removes native work and legacy-todo reconstruction; independently enabled ticket reminders remain accessible. Native follow-up/review/deadline fields remain useful with every notification channel disabled.
+Feature ownership: native work CRUD, permanent links, history, search, changes and linked-source access use `tools.work-records`. Scheduling and reminder receipts use `service-desk.reminders` independently. Leads are not native any more: `lead` and `activity` are always listed in unavailableCollections with `reason:"crm_backed"` and `replacement:"/api/crm-leads"` (read leads there, see crm-leads.md); context uses `service-desk.context`. Current-context exposes only currently authorized enabled collections and omits reminder data/queries when Reminders is disabled. Disabling Work removes native work and legacy-todo reconstruction; independently enabled ticket reminders remain accessible. Native follow-up/review/deadline fields remain useful with every notification channel disabled.

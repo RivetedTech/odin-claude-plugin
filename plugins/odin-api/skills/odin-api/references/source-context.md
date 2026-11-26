@@ -1,4 +1,4 @@
-# Source-backed context (reviewed source contract)
+# Source-backed context (pending release)
 
 `/api/native-context` stores source-backed facts, decisions, commitments, open questions
 and meeting context in the existing durable record store. A context commitment links
